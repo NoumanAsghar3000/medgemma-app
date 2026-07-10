@@ -30,23 +30,20 @@
     min-height:100vh;
   }
   header{
-    padding:18px 20px 14px;
+    padding:16px 20px;
     background:var(--ink);
     color:#eef4f2;
     display:flex;
     align-items:center;
     justify-content:space-between;
+    -webkit-user-select:none;
+    user-select:none;
   }
   header h1{
     font-size:17px;
     margin:0;
     font-weight:600;
     letter-spacing:0.2px;
-  }
-  header .sub{
-    font-size:11.5px;
-    color:#9fb9b3;
-    margin-top:2px;
   }
   #settingsBtn{
     background:none;
@@ -68,18 +65,11 @@
     margin:0 auto;
     overflow-y:auto;
   }
-  .card{
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-    padding:16px;
-  }
   .msg{
     border-radius:var(--radius);
     padding:14px 16px;
     font-size:14.5px;
     line-height:1.55;
-    white-space:pre-wrap;
   }
   .msg.user{background:var(--accent-soft); border:1px solid #cfe4dc;}
   .msg.assistant{background:var(--panel); border:1px solid var(--line);}
@@ -115,10 +105,26 @@
     cursor:pointer;
   }
   .preview-thumb{
-    max-width:160px;
+    max-width:140px;
     border-radius:10px;
-    margin-bottom:8px;
-    display:block;
+    margin:0 6px 6px 0;
+    display:inline-block;
+  }
+  .file-chip-img{
+    max-width:140px;
+    max-height:140px;
+    border-radius:10px;
+  }
+  .file-chip-doc{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:6px 10px;
+    font-size:12.5px;
+    margin:0 6px 6px 0;
   }
   .composer{
     position:sticky;
@@ -178,16 +184,29 @@
     cursor:pointer;
   }
   #sendBtn:disabled{opacity:0.5;}
-  #imagePreviewBar{
+  #attachPreviewBar{
     display:none;
-    align-items:center;
-    gap:8px;
-    font-size:12px;
-    color:var(--ink-soft);
+    flex-wrap:wrap;
+    align-items:flex-start;
+    padding:2px 2px 0;
   }
-  #imagePreviewBar img{width:34px;height:34px;border-radius:8px;object-fit:cover;}
-  #imagePreviewBar button{
-    border:none;background:none;color:var(--warn);cursor:pointer;font-size:12px;
+  .file-chip-wrap{
+    position:relative;
+    display:inline-block;
+  }
+  .file-chip-remove{
+    position:absolute;
+    top:-4px; right:2px;
+    background:var(--warn);
+    color:#fff;
+    border:none;
+    border-radius:50%;
+    width:18px; height:18px;
+    font-size:11px;
+    line-height:18px;
+    text-align:center;
+    cursor:pointer;
+    padding:0;
   }
   .status{
     font-size:12.5px;
@@ -218,31 +237,23 @@
 <body>
 
 <header>
-  <div>
+  <div id="headerTitle">
     <h1>MedGemma Assistant</h1>
-    <div class="sub">Private analysis tool — not a diagnosis</div>
   </div>
-  <button id="settingsBtn">⚙ Settings</button>
+  <button id="settingsBtn" style="display:none;">⚙ Settings</button>
 </header>
 
-<main id="thread">
-  <div class="card">
-    Enter a note, upload an image, or both, then send. The analysis and a
-    downloadable PDF report will appear below.
-  </div>
-</main>
+<main id="thread"></main>
 
 <div class="composer">
   <div class="composer-inner">
-    <div id="imagePreviewBar">
-      <img id="imagePreviewThumb" alt="" />
-      <span id="imagePreviewName"></span>
-      <button id="clearImageBtn">Remove</button>
-    </div>
-    <textarea id="textInput" placeholder="Describe symptoms, notes, or a question about the attached image..."></textarea>
+    <div id="attachPreviewBar"></div>
+    <textarea id="textInput" placeholder="Describe symptoms, notes, or a question about the attached files..."></textarea>
     <div class="composer-row">
-      <button class="icon-btn" id="attachBtn" title="Attach image">📎</button>
-      <input type="file" id="fileInput" accept="image/*" hidden />
+      <button class="icon-btn" id="cameraBtn" title="Take photo">📷</button>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden />
+      <button class="icon-btn" id="attachBtn" title="Attach files">📎</button>
+      <input type="file" id="fileInput" accept="image/*,application/pdf,.pdf" multiple hidden />
       <span class="status" id="statusText"></span>
       <button id="sendBtn">Analyze</button>
     </div>
@@ -252,12 +263,12 @@
 <dialog id="settingsDialog">
   <h3 style="margin:0 0 4px;font-size:15px;">Connection settings</h3>
   <p style="font-size:12px;color:var(--ink-soft);margin:0;">
-    Point this app at your Hugging Face Space and its API key.
+    Point this app at your backend API and its access key.
   </p>
-  <label for="apiBaseInput">Space API URL</label>
-  <input id="apiBaseInput" placeholder="https://your-username-your-space.hf.space" />
+  <label for="apiBaseInput">API URL</label>
+  <input id="apiBaseInput" placeholder="https://your-modal-app.modal.run" />
   <label for="apiKeyInput">API key</label>
-  <input id="apiKeyInput" placeholder="the API_KEY secret you set on the Space" />
+  <input id="apiKeyInput" placeholder="the API_KEY you set on the backend" />
   <div class="row">
     <button id="settingsCancel">Cancel</button>
     <button id="settingsSave" class="primary">Save</button>
@@ -268,54 +279,108 @@
 const thread = document.getElementById('thread');
 const textInput = document.getElementById('textInput');
 const fileInput = document.getElementById('fileInput');
+const cameraInput = document.getElementById('cameraInput');
 const attachBtn = document.getElementById('attachBtn');
+const cameraBtn = document.getElementById('cameraBtn');
 const sendBtn = document.getElementById('sendBtn');
 const statusText = document.getElementById('statusText');
-const imagePreviewBar = document.getElementById('imagePreviewBar');
-const imagePreviewThumb = document.getElementById('imagePreviewThumb');
-const imagePreviewName = document.getElementById('imagePreviewName');
-const clearImageBtn = document.getElementById('clearImageBtn');
+const attachPreviewBar = document.getElementById('attachPreviewBar');
+const settingsBtn = document.getElementById('settingsBtn');
+const headerTitle = document.getElementById('headerTitle');
 
 const settingsDialog = document.getElementById('settingsDialog');
 const apiBaseInput = document.getElementById('apiBaseInput');
 const apiKeyInput = document.getElementById('apiKeyInput');
 
-let selectedFile = null;
+let selectedFiles = []; // {file, id}
+let fileIdCounter = 0;
+
+function isConfigured() {
+  return !!(localStorage.getItem('mg_api_base') && localStorage.getItem('mg_api_key'));
+}
+
+function updateSettingsVisibility() {
+  // Settings stays hidden once configured, to keep the header clean —
+  // long-press the title to bring it back if you ever need to reconfigure.
+  settingsBtn.style.display = isConfigured() ? 'none' : 'inline-block';
+}
 
 function loadSettings() {
   apiBaseInput.value = localStorage.getItem('mg_api_base') || '';
   apiKeyInput.value = localStorage.getItem('mg_api_key') || '';
 }
-document.getElementById('settingsBtn').onclick = () => { loadSettings(); settingsDialog.showModal(); };
+settingsBtn.onclick = () => { loadSettings(); settingsDialog.showModal(); };
 document.getElementById('settingsCancel').onclick = () => settingsDialog.close();
 document.getElementById('settingsSave').onclick = () => {
   localStorage.setItem('mg_api_base', apiBaseInput.value.trim().replace(/\/+$/,''));
   localStorage.setItem('mg_api_key', apiKeyInput.value.trim());
   settingsDialog.close();
+  updateSettingsVisibility();
 };
 
-// First run: force settings open if nothing configured yet
+// Long-press (or long-click on desktop) the header title to reopen settings
+let pressTimer = null;
+headerTitle.addEventListener('touchstart', () => {
+  pressTimer = setTimeout(() => { loadSettings(); settingsDialog.showModal(); }, 1200);
+});
+headerTitle.addEventListener('touchend', () => clearTimeout(pressTimer));
+headerTitle.addEventListener('mousedown', () => {
+  pressTimer = setTimeout(() => { loadSettings(); settingsDialog.showModal(); }, 1200);
+});
+headerTitle.addEventListener('mouseup', () => clearTimeout(pressTimer));
+
 window.addEventListener('load', () => {
-  if (!localStorage.getItem('mg_api_base')) {
+  updateSettingsVisibility();
+  if (!isConfigured()) {
     loadSettings();
     settingsDialog.showModal();
   }
 });
 
 attachBtn.onclick = () => fileInput.click();
-fileInput.onchange = () => {
-  const f = fileInput.files[0];
-  if (!f) return;
-  selectedFile = f;
-  imagePreviewThumb.src = URL.createObjectURL(f);
-  imagePreviewName.textContent = f.name;
-  imagePreviewBar.style.display = 'flex';
-};
-clearImageBtn.onclick = () => {
-  selectedFile = null;
-  fileInput.value = '';
-  imagePreviewBar.style.display = 'none';
-};
+cameraBtn.onclick = () => cameraInput.click();
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    selectedFiles.push({ file: f, id: fileIdCounter++ });
+  }
+  renderAttachPreview();
+}
+fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ''; };
+cameraInput.onchange = () => { addFiles(cameraInput.files); cameraInput.value = ''; };
+
+function renderAttachPreview() {
+  attachPreviewBar.innerHTML = '';
+  if (selectedFiles.length === 0) {
+    attachPreviewBar.style.display = 'none';
+    return;
+  }
+  attachPreviewBar.style.display = 'flex';
+  for (const entry of selectedFiles) {
+    const wrap = document.createElement('div');
+    wrap.className = 'file-chip-wrap';
+    if (entry.file.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.className = 'file-chip-img';
+      img.src = URL.createObjectURL(entry.file);
+      wrap.appendChild(img);
+    } else {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip-doc';
+      chip.textContent = '📄 ' + entry.file.name;
+      wrap.appendChild(chip);
+    }
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'file-chip-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = () => {
+      selectedFiles = selectedFiles.filter(e => e.id !== entry.id);
+      renderAttachPreview();
+    };
+    wrap.appendChild(removeBtn);
+    attachPreviewBar.appendChild(wrap);
+  }
+}
 
 function addMessage(role, html) {
   const div = document.createElement('div');
@@ -331,9 +396,9 @@ function escapeHtml(s) {
 }
 
 function formatAnalysisText(s) {
-  // Same convention the PDF uses: the model outputs markdown-style
-  // **bold** for its own sub-headings — render that as real bold here too,
-  // instead of showing literal asterisks, so the in-app view matches the PDF.
+  // The model outputs markdown-style **bold** for its own sub-headings —
+  // render that as real bold instead of showing literal asterisks, so the
+  // in-app view matches the PDF's formatting.
   let html = escapeHtml(s);
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\n/g, '<br>');
@@ -352,7 +417,7 @@ function downloadPdfBase64(base64, filename) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  return url; // keep for the manual button too
+  return url;
 }
 
 async function sendAnalysis() {
@@ -365,32 +430,34 @@ async function sendAnalysis() {
   }
 
   const text = textInput.value.trim();
-  if (!text && !selectedFile) return;
+  if (!text && selectedFiles.length === 0) return;
 
   let userHtml = '<div class="label">You</div>';
-  if (selectedFile) {
-    userHtml += `<img class="preview-thumb" src="${URL.createObjectURL(selectedFile)}" />`;
+  for (const entry of selectedFiles) {
+    if (entry.file.type.startsWith('image/')) {
+      userHtml += `<img class="preview-thumb" src="${URL.createObjectURL(entry.file)}" />`;
+    } else {
+      userHtml += `<div class="file-chip-doc" style="margin-bottom:6px;">📄 ${escapeHtml(entry.file.name)}</div>`;
+    }
   }
-  if (text) userHtml += escapeHtml(text);
+  if (text) userHtml += `<div>${escapeHtml(text)}</div>`;
   addMessage('user', userHtml);
 
+  const filesToSend = selectedFiles.map(e => e.file);
   textInput.value = '';
+  selectedFiles = [];
+  renderAttachPreview();
   sendBtn.disabled = true;
-  statusText.textContent = 'Analyzing — this can take a minute on CPU...';
+  statusText.textContent = 'Analyzing...';
 
   const formData = new FormData();
   formData.append('text', text);
-  if (selectedFile) formData.append('image', selectedFile);
-
-  const fileToClear = selectedFile;
-  clearImageBtn.onclick(); // reset composer image state
+  for (const f of filesToSend) formData.append('files', f);
 
   try {
     const res = await fetch(apiBase + '/analyze', {
       method: 'POST',
-      headers: {
-        'X-API-Key': apiKey,
-      },
+      headers: { 'X-API-Key': apiKey },
       body: formData,
     });
     if (!res.ok) {
@@ -398,7 +465,6 @@ async function sendAnalysis() {
       throw new Error(`Server returned ${res.status}: ${errText}`);
     }
     const data = await res.json();
-
     const pdfUrl = downloadPdfBase64(data.pdf_base64, data.filename);
 
     addMessage('assistant', `
