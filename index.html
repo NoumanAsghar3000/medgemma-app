@@ -258,8 +258,6 @@
   <input id="apiBaseInput" placeholder="https://your-username-your-space.hf.space" />
   <label for="apiKeyInput">API key</label>
   <input id="apiKeyInput" placeholder="the API_KEY secret you set on the Space" />
-  <label for="hfTokenInput">Hugging Face token</label>
-  <input id="hfTokenInput" placeholder="hf_... (required because the Space is private)" />
   <div class="row">
     <button id="settingsCancel">Cancel</button>
     <button id="settingsSave" class="primary">Save</button>
@@ -281,21 +279,18 @@ const clearImageBtn = document.getElementById('clearImageBtn');
 const settingsDialog = document.getElementById('settingsDialog');
 const apiBaseInput = document.getElementById('apiBaseInput');
 const apiKeyInput = document.getElementById('apiKeyInput');
-const hfTokenInput = document.getElementById('hfTokenInput');
 
 let selectedFile = null;
 
 function loadSettings() {
   apiBaseInput.value = localStorage.getItem('mg_api_base') || '';
   apiKeyInput.value = localStorage.getItem('mg_api_key') || '';
-  hfTokenInput.value = localStorage.getItem('mg_hf_token') || '';
 }
 document.getElementById('settingsBtn').onclick = () => { loadSettings(); settingsDialog.showModal(); };
 document.getElementById('settingsCancel').onclick = () => settingsDialog.close();
 document.getElementById('settingsSave').onclick = () => {
   localStorage.setItem('mg_api_base', apiBaseInput.value.trim().replace(/\/+$/,''));
   localStorage.setItem('mg_api_key', apiKeyInput.value.trim());
-  localStorage.setItem('mg_hf_token', hfTokenInput.value.trim());
   settingsDialog.close();
 };
 
@@ -335,6 +330,16 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function formatAnalysisText(s) {
+  // Same convention the PDF uses: the model outputs markdown-style
+  // **bold** for its own sub-headings — render that as real bold here too,
+  // instead of showing literal asterisks, so the in-app view matches the PDF.
+  let html = escapeHtml(s);
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
 function downloadPdfBase64(base64, filename) {
   const byteChars = atob(base64);
   const bytes = new Uint8Array(byteChars.length);
@@ -353,8 +358,7 @@ function downloadPdfBase64(base64, filename) {
 async function sendAnalysis() {
   const apiBase = localStorage.getItem('mg_api_base');
   const apiKey = localStorage.getItem('mg_api_key');
-  const hfToken = localStorage.getItem('mg_hf_token');
-  if (!apiBase || !apiKey || !hfToken) {
+  if (!apiBase || !apiKey) {
     loadSettings();
     settingsDialog.showModal();
     return;
@@ -386,7 +390,6 @@ async function sendAnalysis() {
       method: 'POST',
       headers: {
         'X-API-Key': apiKey,
-        'Authorization': 'Bearer ' + hfToken,
       },
       body: formData,
     });
@@ -400,7 +403,7 @@ async function sendAnalysis() {
 
     addMessage('assistant', `
       <div class="label">MedGemma Analysis</div>
-      ${escapeHtml(data.analysis_text)}
+      ${formatAnalysisText(data.analysis_text)}
       <div class="disclaimer">${escapeHtml(data.disclaimer)}</div>
       <button class="download-btn" onclick="window.open('${pdfUrl}', '_blank')">⬇ Download PDF report</button>
     `);
