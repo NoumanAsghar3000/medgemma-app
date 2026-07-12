@@ -15,8 +15,6 @@
     --line:#dfe6e3;
     --accent:#1f6f5c;
     --accent-soft:#e4f0ec;
-    --warn:#8a1f1f;
-    --warn-soft:#fbeaea;
     --radius:14px;
   }
   *{box-sizing:border-box;}
@@ -33,9 +31,6 @@
     padding:16px 20px;
     background:var(--ink);
     color:#eef4f2;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
     -webkit-user-select:none;
     user-select:none;
   }
@@ -44,15 +39,6 @@
     margin:0;
     font-weight:600;
     letter-spacing:0.2px;
-  }
-  #settingsBtn{
-    background:none;
-    border:1px solid #35545e;
-    color:#cfe3de;
-    border-radius:10px;
-    padding:6px 10px;
-    font-size:12px;
-    cursor:pointer;
   }
   main{
     flex:1;
@@ -81,14 +67,12 @@
     margin-bottom:6px;
     font-weight:600;
   }
-  .disclaimer{
-    background:var(--warn-soft);
-    border:1px solid #f0cfcf;
-    color:var(--warn);
-    font-size:11.5px;
-    padding:8px 10px;
-    border-radius:10px;
-    margin-top:8px;
+  .disclaimer-line{
+    color:#9aa0a6;
+    font-size:10.5px;
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px solid var(--line);
   }
   .download-btn{
     display:inline-flex;
@@ -197,7 +181,7 @@
   .file-chip-remove{
     position:absolute;
     top:-4px; right:2px;
-    background:var(--warn);
+    background:#8a1f1f;
     color:#fff;
     border:none;
     border-radius:50%;
@@ -213,34 +197,12 @@
     color:var(--ink-soft);
     padding:0 4px;
   }
-  dialog{
-    border:none;
-    border-radius:var(--radius);
-    padding:20px;
-    width:min(340px, 88vw);
-  }
-  dialog label{display:block;font-size:12.5px;color:var(--ink-soft);margin:10px 0 4px;}
-  dialog input{
-    width:100%;
-    padding:9px 10px;
-    border:1px solid var(--line);
-    border-radius:8px;
-    font-size:13.5px;
-  }
-  dialog .row{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
-  dialog button{
-    border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;border:1px solid var(--line);background:#fff;
-  }
-  dialog button.primary{background:var(--accent);color:#fff;border:none;}
 </style>
 </head>
 <body>
 
 <header>
-  <div id="headerTitle">
-    <h1>MedGemma Assistant</h1>
-  </div>
-  <button id="settingsBtn" style="display:none;">⚙ Settings</button>
+  <h1>MedGemma Assistant</h1>
 </header>
 
 <main id="thread"></main>
@@ -260,22 +222,16 @@
   </div>
 </div>
 
-<dialog id="settingsDialog">
-  <h3 style="margin:0 0 4px;font-size:15px;">Connection settings</h3>
-  <p style="font-size:12px;color:var(--ink-soft);margin:0;">
-    Point this app at your backend API and its access key.
-  </p>
-  <label for="apiBaseInput">API URL</label>
-  <input id="apiBaseInput" placeholder="https://your-modal-app.modal.run" />
-  <label for="apiKeyInput">API key</label>
-  <input id="apiKeyInput" placeholder="the API_KEY you set on the backend" />
-  <div class="row">
-    <button id="settingsCancel">Cancel</button>
-    <button id="settingsSave" class="primary">Save</button>
-  </div>
-</dialog>
-
 <script>
+// ---------------------------------------------------------------------
+// Backend connection — hardcoded so there's no in-app Settings screen.
+// If you ever redeploy the backend to a new URL or rotate the API key,
+// update the two constants below and re-publish this file.
+// ---------------------------------------------------------------------
+const API_BASE = "https://noumanasghar3000--medgemma-app-medgemmamodel-web.modal.run";
+const API_KEY = "GHY89-45LOP-VHK60";
+// ---------------------------------------------------------------------
+
 const thread = document.getElementById('thread');
 const textInput = document.getElementById('textInput');
 const fileInput = document.getElementById('fileInput');
@@ -285,57 +241,9 @@ const cameraBtn = document.getElementById('cameraBtn');
 const sendBtn = document.getElementById('sendBtn');
 const statusText = document.getElementById('statusText');
 const attachPreviewBar = document.getElementById('attachPreviewBar');
-const settingsBtn = document.getElementById('settingsBtn');
-const headerTitle = document.getElementById('headerTitle');
-
-const settingsDialog = document.getElementById('settingsDialog');
-const apiBaseInput = document.getElementById('apiBaseInput');
-const apiKeyInput = document.getElementById('apiKeyInput');
 
 let selectedFiles = []; // {file, id}
 let fileIdCounter = 0;
-
-function isConfigured() {
-  return !!(localStorage.getItem('mg_api_base') && localStorage.getItem('mg_api_key'));
-}
-
-function updateSettingsVisibility() {
-  // Settings stays hidden once configured, to keep the header clean —
-  // long-press the title to bring it back if you ever need to reconfigure.
-  settingsBtn.style.display = isConfigured() ? 'none' : 'inline-block';
-}
-
-function loadSettings() {
-  apiBaseInput.value = localStorage.getItem('mg_api_base') || '';
-  apiKeyInput.value = localStorage.getItem('mg_api_key') || '';
-}
-settingsBtn.onclick = () => { loadSettings(); settingsDialog.showModal(); };
-document.getElementById('settingsCancel').onclick = () => settingsDialog.close();
-document.getElementById('settingsSave').onclick = () => {
-  localStorage.setItem('mg_api_base', apiBaseInput.value.trim().replace(/\/+$/,''));
-  localStorage.setItem('mg_api_key', apiKeyInput.value.trim());
-  settingsDialog.close();
-  updateSettingsVisibility();
-};
-
-// Long-press (or long-click on desktop) the header title to reopen settings
-let pressTimer = null;
-headerTitle.addEventListener('touchstart', () => {
-  pressTimer = setTimeout(() => { loadSettings(); settingsDialog.showModal(); }, 1200);
-});
-headerTitle.addEventListener('touchend', () => clearTimeout(pressTimer));
-headerTitle.addEventListener('mousedown', () => {
-  pressTimer = setTimeout(() => { loadSettings(); settingsDialog.showModal(); }, 1200);
-});
-headerTitle.addEventListener('mouseup', () => clearTimeout(pressTimer));
-
-window.addEventListener('load', () => {
-  updateSettingsVisibility();
-  if (!isConfigured()) {
-    loadSettings();
-    settingsDialog.showModal();
-  }
-});
 
 attachBtn.onclick = () => fileInput.click();
 cameraBtn.onclick = () => cameraInput.click();
@@ -396,12 +304,19 @@ function escapeHtml(s) {
 }
 
 function formatAnalysisText(s) {
-  // The model outputs markdown-style **bold** for its own sub-headings —
-  // render that as real bold instead of showing literal asterisks, so the
-  // in-app view matches the PDF's formatting.
-  let html = escapeHtml(s);
+  // Matches the PDF's formatting conventions: **bold** sub-headings render
+  // bold, and "* item" bullet lines render as real bullets instead of
+  // literal asterisks.
+  const escaped = escapeHtml(s);
+  const lines = escaped.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+      return '&nbsp;&nbsp;&#8226;&nbsp; ' + trimmed.slice(2).trim();
+    }
+    return line;
+  });
+  let html = lines.join('<br>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\n/g, '<br>');
   return html;
 }
 
@@ -421,14 +336,6 @@ function downloadPdfBase64(base64, filename) {
 }
 
 async function sendAnalysis() {
-  const apiBase = localStorage.getItem('mg_api_base');
-  const apiKey = localStorage.getItem('mg_api_key');
-  if (!apiBase || !apiKey) {
-    loadSettings();
-    settingsDialog.showModal();
-    return;
-  }
-
   const text = textInput.value.trim();
   if (!text && selectedFiles.length === 0) return;
 
@@ -455,9 +362,9 @@ async function sendAnalysis() {
   for (const f of filesToSend) formData.append('files', f);
 
   try {
-    const res = await fetch(apiBase + '/analyze', {
+    const res = await fetch(API_BASE + '/analyze', {
       method: 'POST',
-      headers: { 'X-API-Key': apiKey },
+      headers: { 'X-API-Key': API_KEY },
       body: formData,
     });
     if (!res.ok) {
@@ -470,7 +377,7 @@ async function sendAnalysis() {
     addMessage('assistant', `
       <div class="label">MedGemma Analysis</div>
       ${formatAnalysisText(data.analysis_text)}
-      <div class="disclaimer">${escapeHtml(data.disclaimer)}</div>
+      <div class="disclaimer-line">${escapeHtml(data.disclaimer)}</div>
       <button class="download-btn" onclick="window.open('${pdfUrl}', '_blank')">⬇ Download PDF report</button>
     `);
     statusText.textContent = 'Done. If the PDF didn\'t auto-download, use the button above.';
